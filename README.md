@@ -3,15 +3,13 @@ sendNscaWrapper
 
 Simple bash wrapper around Nagios send_nsca
 
-= NAME
+## NAME ##
     LiberoSendNSCA.sh - Libero custom script to send NSCA events to Nagios monitoring
 
-= SYNOPSIS
+## SYNOPSIS ##
     LiberoSendNSCA.sh <script> <nagiosHostname> [<options>]
- 
-= DESCRIPTION
-           -o c:m:t:p:s:hd \
-           -l nscacfg:,nscadelim:,nscato:,nscaport:,sendnsca:,help,debug \
+
+## DESCRIPTION ##
      -c, --nscacfg   <send_nsca config file>
             Specify send_nsca config file
  						(default /etc/nagios/send_nsca.cfg)
@@ -33,7 +31,7 @@ Simple bash wrapper around Nagios send_nsca
      -d, --debug
             Enable debug statements
  
-= EXAMPLES
+## EXAMPLES ##
      [.. to be filled soon ..]
  
 
