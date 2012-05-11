@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 #
 # NAME
-#   LiberoSendNSCA.sh - Libero custom script to send NSCA events to Nagios
-#                          monitoring
+#   sendNscaWrapper.sh -   custom script to send NSCA events to Nagios 
+#                          passive monitoring checks
 # SYNOPSIS
-#   LiberoSendNSCA.sh <script> <nagiosHostname> [<options>]
+#   sendNscaWrapper.sh <script> <nagiosHostname> <svcdescription> [<options>]
 #
 # DESCRIPTION
-#          -o c:m:t:p:s:hd \
-#          -l nscacfg:,nscadelim:,nscato:,nscaport:,sendnsca:,help,debug \
 #    -c, --nscacfg   <send_nsca config file>
 #           Specify send_nsca config file
 #						(default /etc/nagios/send_nsca.cfg)
@@ -21,10 +19,15 @@
 #    -p, --nscaport  <send_nsca nagios target port>
 #           Specify send_nsca target port
 #           (default 5667)
+#
 #    -s, --sendnsca  <send_nsca bin location>
 #           Specify send_nsca bin location
 #           By default send_nsca is searched in /usr/bin/send_nsca and then
 #           in the $PATH structure
+#    -n, --hostname  <send_nsca sender hostname>
+#           Specify send_nsca sender hostname
+#           By default send_nsca will use the result of `hostname -f`
+#
 #    -h, --help
 #           Output this help text
 #    -d, --debug
@@ -50,11 +53,14 @@ nscaPort=""   	# default 5667
 nscaTimeout=""	# default 10 seconds
 nscaDelim=""  	# default "\t"
 nscaCfg=""    	# default /etc/nagios/send_nsca.cfg
+hostname=""     # default 'hostname -f'
+svcdesc=""      # mandatory
+
 
 # Process parameters
 params="$(getopt \
-          -o c:m:t:p:s:hd \
-          -l nscacfg:,nscadelim:,nscato:,nscaport:,sendnsca:,help,debug \
+          -o c:m:t:p:s:n:hd \
+          -l nscacfg:,nscadelim:,nscato:,nscaport:,sendnsca:,hostname:,help,debug \
           --name "$cmdname" -- "$@")"
 
 # Custom errors
@@ -134,6 +140,10 @@ unset params
 while true
 do
     case "$1" in
+        -n|hostname)
+            hostname="${2-}"
+            shift 2
+            ;;
 				-s|sendnsca)
 						sendnscaLocation="${2-}"
 						shift 2
@@ -178,7 +188,14 @@ do
 								usage
 								error "" "$EX_USAGE"
             fi
-            if [ -n "${3:-}" ]
+            if [ -z "${3:-}" ]
+            then
+                echo  "You must specify the Nagios monitoring"\
+                      " passive service description"
+                usage
+                error "" "$EX_USAGE"
+            fi
+            if [ -n "${4:-}" ]
             then
                 echo  "Too many parameters"
 								usage
@@ -217,6 +234,10 @@ then
 	error "Cannot resolve specified Nagios Hostname" "$EX_CRITICAL"
 fi
 
+svcdesc="${3}"
+outputDebug "svcdesc: $svcdesc" "$debug"
+
+
 sendNscaCMD="$sendnscaLocation -H $nagiosHostname"
 if [[ -n "$nscaPort" ]]
 then
@@ -237,7 +258,7 @@ if [[ -n "$nscaCfg" ]]
 then
 	if [[ -r "$nscaCfg" ]]
 	then
-		outputDebug "nscaCfg : $nscaDelim" "$debug"
+		outputDebug "nscaCfg : $nscaCfg" "$debug"
 		sendNscaCMD="$sendNscaCMD -c $nscaCfg"
 	else
 		echo "Cannot find/read specified send_nsca config file $nscaCfg"
@@ -245,7 +266,6 @@ then
 	fi
 fi
 
-outputDebug "sendNscaCMD : $sendNscaCMD" "$debug"
 # actual script execution
 set +e
 	scriptOutput="$($extScript 2>&1)"
@@ -254,6 +274,30 @@ set -e
 outputDebug "scriptOutput : $scriptOutput" "$debug"
 outputDebug "scriptStatus : $scriptStatus" "$debug"
 
-sendNscaOutput="$($sendNscaCMD)"
+if [[ -z "$hostname" ]]
+then
+  hostname=$(hostname -f)
+fi
+outputDebug "hostname: $hostname" "$debug"
+
+if [[ -z "$nscaDelim" ]]
+then
+  nscaDelim="\t"
+fi
+outputDebug "nscaDelim: $nscaDelim" "$debug"
+
+sendNscaMsg=""
+sendNscaMsg="$sendNscaMsg""$hostname""$nscaDelim""$svcdesc""$nscaDelim"
+sendNscaMsg="$sendNscaMsg""$scriptStatus""$nscaDelim""$scriptOutput"
+
+outputDebug "sendNscaCMD : $sendNscaCMD" "$debug"
+outputDebug "sendNscaMsg: $sendNscaMsg" "$debug"
+set +e
+  sendNscaOutput="$(echo -e \'$sendNscaMsg \'| $sendNscaCMD 2>&1)"
+  sendNscaStatus="$(echo ${PIPESTATUS[0]})"
+set -e
 outputDebug "sendNscaOutput: $sendNscaOutput" "$debug"
-exit $EX_OK
+outputDebug "sendNscaStatus : $sendNscaStatus" "$debug"
+
+echo "$sendNscaOutput"
+exit $sendNscaStatus
