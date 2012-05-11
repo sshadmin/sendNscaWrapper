@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # NAME
-#   sendNscaWrapper.sh -   custom script to send NSCA events to Nagios 
+#   sendNscaWrapper.sh -   custom script to send NSCA events to Nagios
 #                          passive monitoring checks
 # SYNOPSIS
 #   sendNscaWrapper.sh <script> <nagiosHostname> <svcdescription> [<options>]
