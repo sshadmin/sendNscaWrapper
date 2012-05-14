@@ -27,7 +27,10 @@
 #    -n, --hostname  <send_nsca sender hostname>
 #           Specify send_nsca sender hostname
 #           By default send_nsca will use the result of `hostname -f`
-#
+#    -b, --bookmark  <bookmark file>
+#           Specify a file to use as a bookmark, to contain last status
+#           and send events ONLY on status change
+#           (if you want to send first event, empty the bookmark file)
 #    -h, --help
 #           Output this help text
 #    -d, --debug
@@ -55,12 +58,13 @@ nscaDelim=""    # default "\t"
 nscaCfg=""      # default /etc/nagios/send_nsca.cfg
 hostname=""     # default 'hostname -f'
 svcdesc=""      # mandatory
+bookmarkfile="" # default not used
 
 
 # Process parameters
 params="$(getopt \
-          -o c:m:t:p:s:n:hd \
-          -l nscacfg:,nscadelim:,nscato:,nscaport:,sendnsca:,hostname:,help,debug \
+          -o c:m:t:p:s:n:b:hd \
+          -l nscacfg:,nscadelim:,nscato:,nscaport:,sendnsca:,hostname:,bookmark:,help,debug \
           --name "$cmdname" -- "$@")"
 
 # Custom errors
@@ -146,6 +150,10 @@ do
             ;;
         -s|sendnsca)
             sendnscaLocation="${2-}"
+            shift 2
+            ;;
+        -b|bookmark)
+            bookmarkfile="${2-}"
             shift 2
             ;;
         -p|nscaport)
@@ -292,12 +300,46 @@ sendNscaMsg="$sendNscaMsg""$scriptStatus""$nscaDelim""$scriptOutput"
 
 outputDebug "sendNscaCMD : $sendNscaCMD" "$debug"
 outputDebug "sendNscaMsg: $sendNscaMsg" "$debug"
-set +e
-  sendNscaOutput="$(echo -e \'$sendNscaMsg \'| $sendNscaCMD 2>&1)"
-  sendNscaStatus="$(echo ${PIPESTATUS[0]})"
-set -e
-outputDebug "sendNscaOutput: $sendNscaOutput" "$debug"
-outputDebug "sendNscaStatus : $sendNscaStatus" "$debug"
 
-echo "$sendNscaOutput"
-exit $sendNscaStatus
+sendEvent=true
+if [[ -n "$bookmarkfile" ]]
+then
+  outputDebug "bookmarkfile is $bookmarkfile" "$debug"
+  if [[ ! -f "$bookmarkfile" ]]
+  then
+    touch "$bookmarkfile"
+  fi
+  if [[ ! -r "$bookmarkfile" ]]
+  then
+    error "Cannot read bookmarkfile, check permission" "$EX_CRITICAL"
+  fi
+  lastStatus="$(cat $bookmarkfile)"
+  outputDebug "lastStatus is $lastStatus" "$debug"
+  if [[ "$lastStatus" == "$scriptStatus" ]]
+  then
+    sendEvent=false
+  else
+    sendEvent=true
+    set +o noclobber
+      echo "$scriptStatus" > "$bookmarkfile"
+    set -o noclobber
+  fi
+else
+  outputDebug "no bookmarkfile specified" "$debug"
+fi
+
+outputDebug "sendEvent is $sendEvent" "$debug"
+if ( "$sendEvent" )
+then
+  outputDebug "Event sent to $nagiosHostname" "$debug"
+  set +e
+    sendNscaOutput="$(echo -e \'$sendNscaMsg \'| $sendNscaCMD 2>&1)"
+    sendNscaStatus="$(echo ${PIPESTATUS[0]})"
+  set -e
+  outputDebug "sendNscaOutput: $sendNscaOutput" "$debug"
+  outputDebug "sendNscaStatus : $sendNscaStatus" "$debug"
+  error "$sendNscaOutput" "$sendNscaStatus"
+else
+  outputDebug "Event NOT sent to $nagiosHostname" "$debug"
+  error "Event NOT sent as status is not changed" "$EX_OK"
+fi

@@ -32,11 +32,14 @@ Simple bash wrapper around Nagios send_nsca
     -n, --hostname  <send_nsca sender hostname>
            Specify send_nsca sender hostname
            By default send_nsca will use the result of `hostname -f`
-
+    -b, --bookmark  <bookmark file>
+           Specify a file to use as a bookmark, to contain last status
+           and send events ONLY on status change
+           (if you want to send first event, empty the bookmark file)
     -h, --help
            Output this help text
     -d, --debug
-           Enable debug statements 
+           Enable debug statements
 
 ## EXAMPLES ##
      [.. to be filled soon ..]
