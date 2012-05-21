@@ -333,7 +333,7 @@ then
   fi
   lastStatus="$(cat $bookmarkfile)"
   outputDebug "lastStatus is $lastStatus" "$debug"
-  if [[ "$lastStatus" -ne "0"  && "$lastStatus" -eq "$scriptStatus" ]]
+  if [[ "$lastStatus" -eq "$scriptStatus" && "$lastStatus" -eq "0" ]]
   then
     sendEvent=false
   else
