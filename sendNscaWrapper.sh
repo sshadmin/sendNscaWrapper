@@ -31,6 +31,8 @@
 #           Specify a file to use as a bookmark, to contain last status
 #           and send events ONLY on status change or status != (OK/0)
 #           (if you want to send first event, empty the bookmark file)
+#    -q, --quiet
+#           Avoid printing any (non-debug) statement
 #    -h, --help
 #           Output this help text
 #    -d, --debug
@@ -52,6 +54,7 @@ debug=false
 cmdname="$(basename -- $0)"
 directory="$(dirname -- "$0")"
 sendnscaLocation=$(command -v send_nsca) || $(echo "")
+quiet=false
 nscaPort=""     # default 5667
 nscaTimeout=""  # default 10 seconds
 nscaDelim=""    # default "\t"
@@ -63,8 +66,8 @@ bookmarkfile="" # default not used
 
 # Process parameters
 params="$(getopt \
-          -o c:m:t:p:s:n:b:hd \
-          -l nscacfg:,nscadelim:,nscato:,nscaport:,sendnsca:,hostname:,bookmark:,help,debug \
+          -o c:m:t:p:s:n:b:qhd \
+          -l nscacfg:,nscadelim:,nscato:,nscaport:,sendnsca:,hostname:,bookmark:,quiet,help,debug \
           --name "$cmdname" -- "$@")"
 
 # Custom errors
@@ -171,6 +174,10 @@ do
         -c|nscacfg)
             nscaCfg="${2-}"
             shift 2
+						;;
+        -q|quiet)
+            quiet=true
+            shift
             ;;
         -d|debug)
             debug=true
@@ -356,8 +363,16 @@ then
   set -e
   outputDebug "sendNscaOutput: $sendNscaOutput" "$debug"
   outputDebug "sendNscaStatus : $sendNscaStatus" "$debug"
-  error "$sendNscaOutput" "$sendNscaStatus"
+  if ( ! "$quiet" )
+  then
+    echo "$sendNscaOutput"
+    exit "$sendNscaStatus"
+  fi
 else
   outputDebug "Event NOT sent to $nagiosHostname" "$debug"
-  error "Event NOT sent as status is not changed" "$EX_OK"
+  if ( ! "$quiet" )
+  then
+    echo "Event NOT sent as status is not changed"
+    exit "$EX_OK"
+  fi
 fi
