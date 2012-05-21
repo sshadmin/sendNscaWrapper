@@ -34,7 +34,7 @@ Simple bash wrapper around Nagios send_nsca
            By default send_nsca will use the result of `hostname -f`
     -b, --bookmark  <bookmark file>
            Specify a file to use as a bookmark, to contain last status
-           and send events ONLY on status change
+           and send events ONLY on status change or status != (OK/0)
            (if you want to send first event, empty the bookmark file)
     -h, --help
            Output this help text
@@ -43,5 +43,3 @@ Simple bash wrapper around Nagios send_nsca
 
 ## EXAMPLES ##
      [.. to be filled soon ..]
- 
-
