@@ -29,7 +29,7 @@
 #           By default send_nsca will use the result of `hostname -f`
 #    -b, --bookmark  <bookmark file>
 #           Specify a file to use as a bookmark, to contain last status
-#           and send events ONLY on status change
+#           and send events ONLY on status change or status != (OK/0)
 #           (if you want to send first event, empty the bookmark file)
 #    -h, --help
 #           Output this help text
@@ -206,8 +206,8 @@ do
             if [ -n "${4:-}" ]
             then
                 echo  "Too many parameters"
-                usage
-                error "" "$EX_USAGE"
+								usage
+								error "" "$EX_USAGE"
             fi
             break
             ;;
@@ -223,7 +223,7 @@ outputDebug 'Debug activated' "$debug"
 outputDebug "sendnscaLocation -> $sendnscaLocation" "$debug"
 if [[ ! -x "$sendnscaLocation" ]]
 then
-  error "Cannot find/execute send_nsca Nagios plugin" "$EX_CRITICAL"
+	error "Cannot find/execute send_nsca Nagios plugin" "$EX_CRITICAL"
 fi
 
 extScript="${1}"
@@ -231,15 +231,33 @@ extScriptBin=$(command -v $extScript) || $(echo "")
 outputDebug "extScript -> $extScriptBin [ $extScript ]" "$debug"
 if [[ ! -x "$extScriptBin" ]]
 then
-  error "Cannot find/execute specified script" "$EX_CRITICAL"
+	error "Cannot find/execute specified script" "$EX_CRITICAL"
 fi
 
 nagiosHostname="${2}"
-nagiosHostnameIP=$(dig +short ${2}) || $(echo "")
-outputDebug "nagiosHostname -> $nagiosHostname : $nagiosHostnameIP" "$debug"
-if [[ ! "$nagiosHostnameIP" ]]
+nagiosHostnameIP=""
+isIP()
+{
+  local isIPHostname="${1}"
+  # isIP="$(echo $isIPHostname | awk '/^\s*[0-2]{0,1}[0-9]{1,2}(\.[0-2]{0,1}[0-9]{1,2}){3}\s*$/ { print $1 }')"
+  isIP="$(echo $isIPHostname | awk '/^\s*[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\s*$/ { print $1 }')";
+  if [[ -n "$isIP" ]]
+  then
+    echo $isIP
+  else
+    echo ""
+  fi
+}
+if [[ ! "$(isIP $nagiosHostname)" ]]
 then
-  error "Cannot resolve specified Nagios Hostname" "$EX_CRITICAL"
+  nagiosHostnameIP=$(dig +short ${2}) || $(echo "")
+  outputDebug "nagiosHostname -> $nagiosHostname : $nagiosHostnameIP" "$debug"
+  if [[ ! "$nagiosHostnameIP" ]]
+  then
+    error "Cannot resolve specified Nagios Hostname" "$EX_CRITICAL"
+  fi
+else
+  outputDebug "nagiosHostname -> $nagiosHostname" "$debug"
 fi
 
 svcdesc="${3}"
@@ -249,35 +267,35 @@ outputDebug "svcdesc: $svcdesc" "$debug"
 sendNscaCMD="$sendnscaLocation -H $nagiosHostname"
 if [[ -n "$nscaPort" ]]
 then
-  outputDebug "nscaPort : $nscaPort" "$debug"
-  sendNscaCMD="$sendNscaCMD -p $nscaPort"
+	outputDebug "nscaPort : $nscaPort" "$debug"
+	sendNscaCMD="$sendNscaCMD -p $nscaPort"
 fi
 if [[ -n "$nscaTimeout" ]]
 then
-  outputDebug "nscaTimeout : $nscaTimeout" "$debug"
-  sendNscaCMD="$sendNscaCMD -t $nscaTimeout"
+	outputDebug "nscaTimeout : $nscaTimeout" "$debug"
+	sendNscaCMD="$sendNscaCMD -t $nscaTimeout"
 fi
 if [[ -n "$nscaDelim" ]]
 then
-  outputDebug "nscaDelim : $nscaDelim" "$debug"
-  sendNscaCMD="$sendNscaCMD -d \"$nscaDelim\""
+	outputDebug "nscaDelim : $nscaDelim" "$debug"
+	sendNscaCMD="$sendNscaCMD -d \"$nscaDelim\""
 fi
 if [[ -n "$nscaCfg" ]]
 then
-  if [[ -r "$nscaCfg" ]]
-  then
-    outputDebug "nscaCfg : $nscaCfg" "$debug"
-    sendNscaCMD="$sendNscaCMD -c $nscaCfg"
-  else
-    echo "Cannot find/read specified send_nsca config file $nscaCfg"
-    exit "$EX_CRITICAL"
-  fi
+	if [[ -r "$nscaCfg" ]]
+	then
+		outputDebug "nscaCfg : $nscaCfg" "$debug"
+		sendNscaCMD="$sendNscaCMD -c $nscaCfg"
+	else
+		echo "Cannot find/read specified send_nsca config file $nscaCfg"
+		exit "$EX_CRITICAL"
+	fi
 fi
 
 # actual script execution
 set +e
-  scriptOutput="$($extScript 2>&1)"
-  scriptStatus="$(echo ${PIPESTATUS[0]})"
+	scriptOutput="$($extScript 2>&1)"
+	scriptStatus="$(echo ${PIPESTATUS[0]})"
 set -e
 outputDebug "scriptOutput : $scriptOutput" "$debug"
 outputDebug "scriptStatus : $scriptStatus" "$debug"
@@ -315,7 +333,7 @@ then
   fi
   lastStatus="$(cat $bookmarkfile)"
   outputDebug "lastStatus is $lastStatus" "$debug"
-  if [[ "$lastStatus" == "$scriptStatus" ]]
+  if [[ "$lastStatus" -ne "0"  && "$lastStatus" -eq "$scriptStatus" ]]
   then
     sendEvent=false
   else
@@ -333,7 +351,7 @@ if ( "$sendEvent" )
 then
   outputDebug "Event sent to $nagiosHostname" "$debug"
   set +e
-    sendNscaOutput="$(echo -e \'$sendNscaMsg \'| $sendNscaCMD 2>&1)"
+    sendNscaOutput="$(echo -e $sendNscaMsg | $sendNscaCMD 2>&1)"
     sendNscaStatus="$(echo ${PIPESTATUS[0]})"
   set -e
   outputDebug "sendNscaOutput: $sendNscaOutput" "$debug"
