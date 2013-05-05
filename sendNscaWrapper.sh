@@ -59,6 +59,7 @@ nscaPort=""     # default 5667
 nscaTimeout=""  # default 10 seconds
 nscaDelim=""    # default "\t"
 nscaCfg=""      # default /etc/nagios/send_nsca.cfg
+nscaCfgDef="/etc/nagios/send_nsca.cfg" # default /etc/nagios/send_nsca.cfg location
 hostname=""     # default 'hostname -f'
 svcdesc=""      # mandatory
 bookmarkfile="" # default not used
@@ -174,7 +175,7 @@ do
         -c|nscacfg)
             nscaCfg="${2-}"
             shift 2
-						;;
+            ;;
         -q|quiet)
             quiet=true
             shift
@@ -213,8 +214,8 @@ do
             if [ -n "${4:-}" ]
             then
                 echo  "Too many parameters"
-								usage
-								error "" "$EX_USAGE"
+                usage
+                error "" "$EX_USAGE"
             fi
             break
             ;;
@@ -230,7 +231,7 @@ outputDebug 'Debug activated' "$debug"
 outputDebug "sendnscaLocation -> $sendnscaLocation" "$debug"
 if [[ ! -x "$sendnscaLocation" ]]
 then
-	error "Cannot find/execute send_nsca Nagios plugin" "$EX_CRITICAL"
+  error "Cannot find/execute send_nsca Nagios plugin" "$EX_CRITICAL"
 fi
 
 extScript="${1}"
@@ -238,7 +239,7 @@ extScriptBin=$(command -v $extScript) || $(echo "")
 outputDebug "extScript -> $extScriptBin [ $extScript ]" "$debug"
 if [[ ! -x "$extScriptBin" ]]
 then
-	error "Cannot find/execute specified script" "$EX_CRITICAL"
+  error "Cannot find/execute specified script" "$EX_CRITICAL"
 fi
 
 nagiosHostname="${2}"
@@ -274,35 +275,38 @@ outputDebug "svcdesc: $svcdesc" "$debug"
 sendNscaCMD="$sendnscaLocation -H $nagiosHostname"
 if [[ -n "$nscaPort" ]]
 then
-	outputDebug "nscaPort : $nscaPort" "$debug"
-	sendNscaCMD="$sendNscaCMD -p $nscaPort"
+  outputDebug "nscaPort : $nscaPort" "$debug"
+  sendNscaCMD="$sendNscaCMD -p $nscaPort"
 fi
 if [[ -n "$nscaTimeout" ]]
 then
-	outputDebug "nscaTimeout : $nscaTimeout" "$debug"
-	sendNscaCMD="$sendNscaCMD -t $nscaTimeout"
+  outputDebug "nscaTimeout : $nscaTimeout" "$debug"
+  sendNscaCMD="$sendNscaCMD -t $nscaTimeout"
 fi
 if [[ -n "$nscaDelim" ]]
 then
-	outputDebug "nscaDelim : $nscaDelim" "$debug"
-	sendNscaCMD="$sendNscaCMD -d \"$nscaDelim\""
+  outputDebug "nscaDelim : $nscaDelim" "$debug"
+  sendNscaCMD="$sendNscaCMD -d \"$nscaDelim\""
 fi
-if [[ -n "$nscaCfg" ]]
+if [[ -z "$nscaCfg" ]]
 then
-	if [[ -r "$nscaCfg" ]]
-	then
-		outputDebug "nscaCfg : $nscaCfg" "$debug"
-		sendNscaCMD="$sendNscaCMD -c $nscaCfg"
-	else
-		echo "Cannot find/read specified send_nsca config file $nscaCfg"
-		exit "$EX_CRITICAL"
-	fi
+  outputDebug "nscaCfg set to default location $nscaCfgDef" "$debug"
+  nscaCfg="$nscaCfgDef"
+fi
+
+if [[ -r "$nscaCfg" ]]
+then
+  outputDebug "nscaCfg : $nscaCfg" "$debug"
+  sendNscaCMD="$sendNscaCMD -c $nscaCfg"
+else
+  echo "Cannot find/read specified send_nsca config file $nscaCfg"
+  exit "$EX_CRITICAL"
 fi
 
 # actual script execution
 set +e
-	scriptOutput="$($extScript 2>&1)"
-	scriptStatus="$(echo ${PIPESTATUS[0]})"
+  scriptOutput="$($extScript 2>&1)"
+  scriptStatus="$(echo ${PIPESTATUS[0]})"
 set -e
 outputDebug "scriptOutput : $scriptOutput" "$debug"
 outputDebug "scriptStatus : $scriptStatus" "$debug"
