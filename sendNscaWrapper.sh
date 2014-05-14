@@ -253,7 +253,7 @@ then
 fi
 
 extScript="${1}"
-extScriptBin=$(command -v $extScript) || $(echo "")
+extScriptBin=$(command -v $extScript | head -n1) || $(echo "")
 outputDebug "extScript -> $extScriptBin [ $extScript ]" "$debug"
 if [[ ! -x "$extScriptBin" ]]
 then
